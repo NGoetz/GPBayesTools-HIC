@@ -84,10 +84,11 @@ class EmulatorBAND:
         sorted_event_ids = sorted(dataDict.keys(), key=lambda x: int(x))
 
         discarded_points = 0
+        logging.info("Not discarding parameters with high errors. To enable this, we have to add cuts!")
         for event_id in sorted_event_ids:
             temp_data = dataDict[event_id]["obs"].transpose()
             statErrMax = np.abs((temp_data[:, 1]/(temp_data[:, 0]+1e-16))).max()
-            if statErrMax > 0.1:
+            if False:
                 logging.info("Discard Parameter {}, stat err = {:.2f}".format(
                                                     event_id, statErrMax))
                 discarded_points += 1

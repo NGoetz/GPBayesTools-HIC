@@ -35,7 +35,6 @@ from scipy.linalg import lapack
 import dill
 
 from . import workdir, parse_model_parameter_file
-from .emulator import Emulator
 from .emulator_BAND import EmulatorBAND
 import scipy.optimize as spo
 from .ptemcee_modified.sampler import Sampler as PTemceeSampler
@@ -164,18 +163,6 @@ class Chain:
         self.closureTestFalg = False
         self.emuList = []
         self.chain = False
-
-
-    def trainEmulator(self, model_parafile="./model.dat",
-                      training_data_path="./training_data", npc=10):
-        # setup the emulator
-        logging.info('Initializing emulators for the training model ...')
-        self.emuList.append(
-                Emulator(training_set_path=training_data_path,
-                         parameter_file=model_parafile,
-                         npc=npc)
-        )
-
 
     def loadEmulator(self, emulatorPathList):
         for i, emuPath in enumerate(emulatorPathList):
