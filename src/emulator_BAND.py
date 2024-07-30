@@ -53,20 +53,14 @@ class EmulatorBAND:
             logging.info("Prepare bulk viscosity parameter PCA ...")
             self.paramTrafoScaler_bulk = StandardScaler()
             self.paramTrafoPCA_bulk = PCA(n_components=self.targetVariance)# 0.99 is the minimum of explained variance
-            self.indices_zeta_s_parameters = [15,16,17,18] # zeta_max,T_zeta0,sigma_plus,sigma_minus
+            self.indices_zeta_s_parameters = [10,11,12,13]
             self.perform_bulk_viscosity_PCA()
 
             logging.info("Prepare shear viscosity parameter PCA ...")
             self.paramTrafoScaler_shear = StandardScaler()
             self.paramTrafoPCA_shear = PCA(n_components=self.targetVariance)# 0.99 is the minimum of explained variance
-            self.indices_eta_s_parameters = [12,13,14]
+            self.indices_eta_s_parameters = [1,2,4,5,6,8]
             self.perform_shear_viscosity_PCA()
-
-            logging.info("Prepare yloss parameter PCA ...")
-            self.paramTrafoScaler_yloss = StandardScaler()
-            self.paramTrafoPCA_yloss = PCA(n_components=self.targetVariance)# 0.99 is the minimum of explained variance
-            self.indices_yloss_parameters = [2,3,4]
-            self.perform_yloss_PCA()
 
             self.nparameters = self.PCA_new_design_points.shape[1]
 
@@ -94,6 +88,7 @@ class EmulatorBAND:
                 discarded_points += 1
                 continue
             self.design_points.append(dataDict[event_id]["parameter"])
+            #print(dataDict[event_id]["parameter"])
             if self.logTrafo_ == False:
                 self.model_data.append(temp_data[:, 0])
                 self.model_data_err.append(temp_data[:, 1])
@@ -108,47 +103,31 @@ class EmulatorBAND:
         logging.info("All training data are loaded.")
         logging.info("Training dataset size: {}, discarded points: {}".format(
             len(self.model_data),discarded_points))
-
-
-    def parametrization_zeta_over_s_vs_T(self,zeta_max,T_zeta0,
-                                         sigma_plus,sigma_minus,T,mu_B):
-        T_zeta_muB = T_zeta0 - 0.15*mu_B**2.
-        if T < T_zeta0:
-            return zeta_max * np.exp(-(T-T_zeta_muB)**2./(2.*sigma_minus**2.))
+        
+    def parametrization_zeta_over_s_vs_e(self, zetaS0, zetaSPeakEpsilon, zetaSSigmaMinus, zetaSSigmaPlus, e):
+        zetaSScaleBeta=0.103
+        if e < zetaSPeakEpsilon:
+            return zetaS0 * np.exp(np.power(zetaSScaleBeta * (np.power(e, 0.25) - np.power(zetaSPeakEpsilon, 0.25)), 2) / (2.0 * np.power(zetaSSigmaMinus, 2)))
         else:
-            return zeta_max * np.exp(-(T-T_zeta_muB)**2./(2.*sigma_plus**2.))
+            return  zetaS0 * np.exp(np.power(zetaSScaleBeta * (np.power(e, 0.25) - np.power(zetaSPeakEpsilon, 0.25)), 2) / (2.0 * np.power(zetaSSigmaPlus, 2)))
 
 
-    def parametrization_eta_over_s_vs_mu_B(self,eta_0,eta_2,eta_4,mu_B):
-        if 0. < mu_B and mu_B <= 0.2:
-            return eta_0 + (eta_2 - eta_0) * (mu_B / 0.2)
-        elif 0.2 < mu_B and mu_B < 0.4:
-            return eta_2 + (eta_4 - eta_2) * ((mu_B - 0.2) / 0.2)
-        else:
-            return eta_4
-
-
-    def parametrization_y_loss_vs_y_init(self,yloss_2,yloss_4,yloss_6,y_init):
-        if 0. < y_init and y_init <= 2.:
-            return yloss_2 * (y_init / 2.)
-        elif 2. < y_init and y_init < 4.:
-            return yloss_2 + (yloss_4 - yloss_2) * ((y_init - 2.) / 2.)
-        else:
-            return yloss_4 + (yloss_6 - yloss_4) * ((y_init - 4.) / 2.)
-
+    def parametrization_eta_over_s_vs_mu_B_T(self,T0,etaSShiftMuB,etaSMin,ah,al,etaSScaleMuB,muB, T):
+        Tc = T0 + etaSShiftMuB * (muB / 0.938)
+        return max(0.0, (etaSMin + (ah * (T - Tc) if T > Tc else al * (T - Tc))) * (1 + etaSScaleMuB * (muB / 0.938)))
 
     def perform_bulk_viscosity_PCA(self):
         # get the corresponding parameters for the training points
         bulk_viscosity_parameters = self.design_points[:,self.indices_zeta_s_parameters]
-        T_range = np.linspace(0.0, 0.5, 100)
+        e_range = np.linspace(0.0, 100, 1000)
         data_functions = []
         # Iterate over each parameter set
         for p in range(self.nev):
             # Evaluate the function for each temperature value in T_range
-            parameter_function = [self.parametrization_zeta_over_s_vs_T(
+            parameter_function = [self.parametrization_zeta_over_s_vs_e(
                 bulk_viscosity_parameters[p, 0], bulk_viscosity_parameters[p, 1],
                 bulk_viscosity_parameters[p, 2], bulk_viscosity_parameters[p, 3],
-                T, 0.0) for T in T_range]
+                e) for e in e_range]
             data_functions.append(parameter_function)
 
         data_functions = np.array(data_functions)
@@ -180,17 +159,29 @@ class EmulatorBAND:
         # get the corresponding parameters for the training points
         shear_viscosity_parameters = self.design_points[:,self.indices_eta_s_parameters]
         mu_B_range = np.linspace(0.0, 0.6, 100)
+        T_range = np.linspace(0.1, 0.4, 100)  # Adjust the range as needed
         data_functions = []
+
         # Iterate over each parameter set
         for p in range(self.nev):
-            # Evaluate the function for each mu_B value in mu_B_range
-            parameter_function = [self.parametrization_eta_over_s_vs_mu_B(
-                shear_viscosity_parameters[p, 0], shear_viscosity_parameters[p, 1],
-                shear_viscosity_parameters[p, 2], mu_B) for mu_B in mu_B_range]
-            data_functions.append(parameter_function)
+            # Create a list to hold the functions for each temperature value
+            parameter_functions_T = []
+            for T in T_range:
+                # Create a list to hold the functions for each mu_B value
+                parameter_functions_mu_B = []
+                for mu_B in mu_B_range:
+                    # Evaluate the function for each mu_B and T value
+                    parameter_function = self.parametrization_eta_over_s_vs_mu_B_T(
+                        shear_viscosity_parameters[p, 5], shear_viscosity_parameters[p, 4],
+                        shear_viscosity_parameters[p, 2], shear_viscosity_parameters[p,0],shear_viscosity_parameters[p,1],shear_viscosity_parameters[p,3], mu_B, T) 
+                    parameter_functions_mu_B.append(parameter_function)
+                parameter_functions_T.append(parameter_functions_mu_B)
+            data_functions.append(parameter_functions_T)
 
         data_functions = np.array(data_functions)
-        scaled_data_functions = self.paramTrafoScaler_shear.fit_transform(data_functions)
+        data_functions_2d = data_functions.reshape(data_functions.shape[0], -1)
+
+        scaled_data_functions = self.paramTrafoScaler_shear.fit_transform(data_functions_2d)
         self.paramTrafoPCA_shear.fit(scaled_data_functions)
 
         # Get the number of components needed to achieve the target variance
@@ -214,44 +205,6 @@ class EmulatorBAND:
         self.design_max = np.concatenate((self.design_max,max_values_PC))
 
 
-    def perform_yloss_PCA(self):
-        # get the corresponding parameters for the training points
-        yloss_parameters = self.design_points[:,self.indices_yloss_parameters]
-        yinit_range = np.linspace(0.0, 6.2, 100)
-        data_functions = []
-        # Iterate over each parameter set
-        for p in range(self.nev):
-            # Evaluate the function for each value in yinit_range
-            parameter_function = [self.parametrization_y_loss_vs_y_init(
-                yloss_parameters[p, 0], yloss_parameters[p, 1],
-                yloss_parameters[p, 2], yinit) for yinit in yinit_range]
-            data_functions.append(parameter_function)
-
-        data_functions = np.array(data_functions)
-        scaled_data_functions = self.paramTrafoScaler_yloss.fit_transform(data_functions)
-        self.paramTrafoPCA_yloss.fit(scaled_data_functions)
-
-        # Get the number of components needed to achieve the target variance
-        n_components = self.paramTrafoPCA_yloss.n_components_
-        logging.info(f"yloss parameter PCA uses {n_components} PCs to explain {self.targetVariance*100}% of the variance ...")
-
-        # Get the principal components
-        # principal_components will have shape (1000, n_components)
-        principal_components = self.paramTrafoPCA_yloss.transform(scaled_data_functions)
-
-        # Modify the design points
-        self.PCA_new_design_points = np.delete(self.PCA_new_design_points, self.indices_yloss_parameters, axis=1)
-        self.PCA_new_design_points = np.concatenate((self.PCA_new_design_points, principal_components), axis=1)
-
-        # delete the parameters from the pardict and add the new ones
-        self.design_min = np.delete(self.design_min, self.indices_yloss_parameters)
-        self.design_max = np.delete(self.design_max, self.indices_yloss_parameters)
-        min_values_PC = np.min(principal_components, axis=0)
-        max_values_PC = np.max(principal_components, axis=0)
-        self.design_min = np.concatenate((self.design_min,min_values_PC))
-        self.design_max = np.concatenate((self.design_max,max_values_PC))
-
-
     def trainEmulatorAutoMask(self):
         trainEventMask = [True]*self.nev
         self.trainEmulator(trainEventMask)
@@ -263,7 +216,6 @@ class EmulatorBAND:
         logging.info(
             'Train GP emulators with {} training points ...'.format(nev))
         X = np.arange(nobs).reshape(-1, 1)
-
         design_points = self.design_points[event_mask, :]
         if self.parameterTrafoPCA_:
             design_points = self.PCA_new_design_points[event_mask, :]
@@ -274,6 +226,7 @@ class EmulatorBAND:
                             method='PCGP',
                             args={'warnings': True}
                             )
+            
         elif self.method_ == 'PCSK':
             sim_sdev = self.model_data_err[event_mask, :].T
 
@@ -305,16 +258,18 @@ class EmulatorBAND:
                 bulk_viscosity_parameters = theta[self.indices_zeta_s_parameters]
             else:
                 bulk_viscosity_parameters = theta[:,self.indices_zeta_s_parameters]
-            T_range = np.linspace(0.0, 0.5, 100)
+            e_range = np.linspace(0.0, 100, 1000)
             data_functions = []
+            # Iterate over each parameter set
             for p in range(theta.shape[0]):
-                parameter_function = [self.parametrization_zeta_over_s_vs_T(
+                # Evaluate the function for each temperature value in T_range
+                print(bulk_viscosity_parameters)
+                parameter_function = [self.parametrization_zeta_over_s_vs_e(
                     bulk_viscosity_parameters[p, 0], bulk_viscosity_parameters[p, 1],
                     bulk_viscosity_parameters[p, 2], bulk_viscosity_parameters[p, 3],
-                    T, 0.0) for T in T_range]
+                    e) for e in e_range]
                 data_functions.append(parameter_function)
             data_functions = np.array(data_functions)
-
             scaled_data = self.paramTrafoScaler_bulk.transform(data_functions)
             projected_parameters = self.paramTrafoPCA_bulk.transform(scaled_data)
 
@@ -326,37 +281,33 @@ class EmulatorBAND:
             else:
                 shear_viscosity_parameters = theta[:,self.indices_eta_s_parameters]
             mu_B_range = np.linspace(0.0, 0.6, 100)
+            T_range = np.linspace(0.1, 0.4, 100)  # Adjust the range as needed
             data_functions = []
+
+            # Iterate over each parameter set
             for p in range(theta.shape[0]):
-                parameter_function = [self.parametrization_eta_over_s_vs_mu_B(
-                    shear_viscosity_parameters[p, 0], shear_viscosity_parameters[p, 1],
-                    shear_viscosity_parameters[p, 2], mu_B) for mu_B in mu_B_range]
-                data_functions.append(parameter_function)
+                # Create a list to hold the functions for each temperature value
+                parameter_functions_T = []
+                for T in T_range:
+                    # Create a list to hold the functions for each mu_B value
+                    parameter_functions_mu_B = []
+                    for mu_B in mu_B_range:
+                        # Evaluate the function for each mu_B and T value
+                        parameter_function = self.parametrization_eta_over_s_vs_mu_B_T(
+                            shear_viscosity_parameters[p, 5], shear_viscosity_parameters[p, 4],
+                            shear_viscosity_parameters[p, 2], shear_viscosity_parameters[p,0],shear_viscosity_parameters[p,1],shear_viscosity_parameters[p,3], mu_B, T) 
+                        parameter_functions_mu_B.append(parameter_function)
+                    parameter_functions_T.append(parameter_functions_mu_B)
+                data_functions.append(parameter_functions_T)
             data_functions = np.array(data_functions)
 
-            scaled_data = self.paramTrafoScaler_shear.transform(data_functions)
+
+            data_functions_2d = data_functions.reshape(data_functions.shape[0], -1)
+
+            scaled_data = self.paramTrafoScaler_shear.fit_transform(data_functions_2d)
             projected_parameters = self.paramTrafoPCA_shear.transform(scaled_data)
 
             new_theta = np.delete(new_theta, self.indices_eta_s_parameters, axis=1)
-            new_theta = np.concatenate((new_theta, projected_parameters), axis=1)
-
-            if np.ndim(theta) == 1:
-                yloss_viscosity_parameters = theta[self.indices_yloss_parameters]
-            else:
-                yloss_viscosity_parameters = theta[:,self.indices_yloss_parameters]
-            yinit_range = np.linspace(0.0, 6.2, 100)
-            data_functions = []
-            for p in range(theta.shape[0]):
-                parameter_function = [self.parametrization_y_loss_vs_y_init(
-                    yloss_viscosity_parameters[p, 0], yloss_viscosity_parameters[p, 1],
-                    yloss_viscosity_parameters[p, 2], yinit) for yinit in yinit_range]
-                data_functions.append(parameter_function)
-            data_functions = np.array(data_functions)
-
-            scaled_data = self.paramTrafoScaler_yloss.transform(data_functions)
-            projected_parameters = self.paramTrafoPCA_yloss.transform(scaled_data)
-
-            new_theta = np.delete(new_theta, self.indices_yloss_parameters, axis=1)
             new_theta = np.concatenate((new_theta, projected_parameters), axis=1)
 
             gp = self.emu.predict(x=X,theta=new_theta)
@@ -381,16 +332,17 @@ class EmulatorBAND:
                 bulk_viscosity_parameters = X[self.indices_zeta_s_parameters]
             else:
                 bulk_viscosity_parameters = X[:,self.indices_zeta_s_parameters]
-            T_range = np.linspace(0.0, 0.5, 100)
+            e_range = np.linspace(0.0, 100, 1000)
             data_functions = []
+            # Iterate over each parameter set
             for p in range(X.shape[0]):
-                parameter_function = [self.parametrization_zeta_over_s_vs_T(
+                # Evaluate the function for each temperature value in T_range
+                parameter_function = [self.parametrization_zeta_over_s_vs_e(
                     bulk_viscosity_parameters[p, 0], bulk_viscosity_parameters[p, 1],
                     bulk_viscosity_parameters[p, 2], bulk_viscosity_parameters[p, 3],
-                    T, 0.0) for T in T_range]
+                    e) for e in e_range]
                 data_functions.append(parameter_function)
             data_functions = np.array(data_functions)
-
             scaled_data = self.paramTrafoScaler_bulk.transform(data_functions)
             projected_parameters = self.paramTrafoPCA_bulk.transform(scaled_data)
 
@@ -402,37 +354,32 @@ class EmulatorBAND:
             else:
                 shear_viscosity_parameters = X[:,self.indices_eta_s_parameters]
             mu_B_range = np.linspace(0.0, 0.6, 100)
+            T_range = np.linspace(0.1, 0.4, 100)  # Adjust the range as needed
             data_functions = []
+
+            # Iterate over each parameter set
             for p in range(X.shape[0]):
-                parameter_function = [self.parametrization_eta_over_s_vs_mu_B(
-                    shear_viscosity_parameters[p, 0], shear_viscosity_parameters[p, 1],
-                    shear_viscosity_parameters[p, 2], mu_B) for mu_B in mu_B_range]
-                data_functions.append(parameter_function)
+                # Create a list to hold the functions for each temperature value
+                parameter_functions_T = []
+                for T in T_range:
+                    # Create a list to hold the functions for each mu_B value
+                    parameter_functions_mu_B = []
+                    for mu_B in mu_B_range:
+                        # Evaluate the function for each mu_B and T value
+                        parameter_function = self.parametrization_eta_over_s_vs_mu_B_T(
+                            shear_viscosity_parameters[p, 5], shear_viscosity_parameters[p, 4],
+                            shear_viscosity_parameters[p, 2], shear_viscosity_parameters[p,0],shear_viscosity_parameters[p,1],shear_viscosity_parameters[p,3], mu_B, T) 
+                        parameter_functions_mu_B.append(parameter_function)
+                    parameter_functions_T.append(parameter_functions_mu_B)
+            data_functions.append(parameter_functions_T)
             data_functions = np.array(data_functions)
 
-            scaled_data = self.paramTrafoScaler_shear.transform(data_functions)
+            data_functions_2d = data_functions.reshape(data_functions.shape[0], -1)
+
+            scaled_data_functions = self.paramTrafoScaler_shear.fit_transform(data_functions_2d)
             projected_parameters = self.paramTrafoPCA_shear.transform(scaled_data)
 
             new_theta = np.delete(new_theta, self.indices_eta_s_parameters, axis=1)
-            new_theta = np.concatenate((new_theta, projected_parameters), axis=1)
-
-            if np.ndim(X) == 1:
-                yloss_viscosity_parameters = X[self.indices_yloss_parameters]
-            else:
-                yloss_viscosity_parameters = X[:,self.indices_yloss_parameters]
-            yinit_range = np.linspace(0.0, 6.2, 100)
-            data_functions = []
-            for p in range(X.shape[0]):
-                parameter_function = [self.parametrization_y_loss_vs_y_init(
-                    yloss_viscosity_parameters[p, 0], yloss_viscosity_parameters[p, 1],
-                    yloss_viscosity_parameters[p, 2], yinit) for yinit in yinit_range]
-                data_functions.append(parameter_function)
-            data_functions = np.array(data_functions)
-
-            scaled_data = self.paramTrafoScaler_yloss.transform(data_functions)
-            projected_parameters = self.paramTrafoPCA_yloss.transform(scaled_data)
-
-            new_theta = np.delete(new_theta, self.indices_yloss_parameters, axis=1)
             new_theta = np.concatenate((new_theta, projected_parameters), axis=1)
 
             gp = self.emu.predict(x=x,theta=new_theta)
