@@ -38,7 +38,9 @@ from . import workdir, parse_model_parameter_file
 from .emulator_BAND import EmulatorBAND
 import scipy.optimize as spo
 from .ptemcee_modified.sampler import Sampler as PTemceeSampler
+#print("Imported PTemceeSampler")
 import pocomc
+#print("Imported pocomc")
 from scipy.stats import uniform
 
 
@@ -159,6 +161,10 @@ class Chain:
         logging.info(
             'Loading the experiment data from {} ...'.format(expdata_path))
         self.expdata, self.expdata_cov = self._read_in_exp_data_pickle(expdata_path)
+        # print(self.expdata)
+        # print(self.expdata.shape)
+        # print(self.expdata_cov)
+        # print(self.expdata_cov.shape)
         self.nobs = self.expdata.shape[1]
         self.closureTestFalg = False
         self.emuList = []
@@ -231,6 +237,10 @@ class Chain:
             # allocate difference (model - experiment) and covariance arrays
             dY = np.empty([nsamples, self.nobs])
             cov = np.empty([nsamples, self.nobs, self.nobs])
+            print("Model shape")
+            print(model_Y.shape)
+            print("Exp shape")
+            print(self.expdata.shape)
             dY = model_Y - self.expdata
             # add experiment cov to model cov
             cov = model_cov + self.expdata_cov
@@ -343,7 +353,10 @@ class Chain:
         data_cov = np.zeros((nobs, nobs))
         model_data_err = model_data_err.flatten()
         np.fill_diagonal(data_cov, (model_data_err)** 2)
-      
+        # print("read in ")
+        # print(model_data.shape)
+        # print(model_data_err.shape)
+        # print("---")
         return model_data, data_cov
 
 
