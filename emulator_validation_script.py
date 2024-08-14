@@ -1,7 +1,5 @@
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
-from matplotlib.ticker import StrMethodFormatter
+
 
 import os
 from os import path
@@ -130,7 +128,7 @@ path_output_pca = parent+'/validation_PCA/'
 path_output_log = parent+'/validation_LOG/'
 path_output_pca_log = parent+'/validation_PCA_LOG/'
 path_output = parent+'/validation_no_pca/'
-data_path = parent+"/actual/latent_train"
+data_path = parent+"/latent_train/"
 if not os.path.exists(path_output):
     os.makedirs(path_output)
 
