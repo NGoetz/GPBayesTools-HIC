@@ -107,9 +107,9 @@ class EmulatorBAND:
     def parametrization_zeta_over_s_vs_e(self, zetaS0, zetaSPeakEpsilon, zetaSSigmaMinus, zetaSSigmaPlus, e):
         zetaSScaleBeta=0.103
         if e < zetaSPeakEpsilon:
-            return zetaS0 * np.exp(np.power(zetaSScaleBeta * (np.power(e, 0.25) - np.power(zetaSPeakEpsilon, 0.25)), 2) / (2.0 * np.power(zetaSSigmaMinus, 2)))
+            return zetaS0 * np.exp(- np.power(zetaSScaleBeta * (np.power(e, 0.25) - np.power(zetaSPeakEpsilon, 0.25)), 2) / (2.0 * np.power(zetaSSigmaMinus, 2)))
         else:
-            return  zetaS0 * np.exp(np.power(zetaSScaleBeta * (np.power(e, 0.25) - np.power(zetaSPeakEpsilon, 0.25)), 2) / (2.0 * np.power(zetaSSigmaPlus, 2)))
+            return  zetaS0 * np.exp(- np.power(zetaSScaleBeta * (np.power(e, 0.25) - np.power(zetaSPeakEpsilon, 0.25)), 2) / (2.0 * np.power(zetaSSigmaPlus, 2)))
 
 
     def parametrization_eta_over_s_vs_mu_B_T(self,T0,etaSShiftMuB,etaSMin,ah,al,etaSScaleMuB,muB, T):
@@ -131,6 +131,7 @@ class EmulatorBAND:
             data_functions.append(parameter_function)
 
         data_functions = np.array(data_functions)
+        #print(data_functions)
         scaled_data_functions = self.paramTrafoScaler_bulk.fit_transform(data_functions)
         self.paramTrafoPCA_bulk.fit(scaled_data_functions)
 
@@ -221,6 +222,9 @@ class EmulatorBAND:
             design_points = self.PCA_new_design_points[event_mask, :]
 
         if self.method_ == 'PCGP':
+            # print(self.model_data[event_mask, :].T)
+            # print(np.mean(self.model_data[event_mask, :].T))
+            # print(np.std(self.model_data[event_mask, :].T))
             self.emu = emulator(x=X,theta=design_points,
                             f=self.model_data[event_mask, :].T,
                             method='PCGP',
@@ -263,7 +267,7 @@ class EmulatorBAND:
             # Iterate over each parameter set
             for p in range(theta.shape[0]):
                 # Evaluate the function for each temperature value in T_range
-                print(bulk_viscosity_parameters)
+                #print(bulk_viscosity_parameters)
                 parameter_function = [self.parametrization_zeta_over_s_vs_e(
                     bulk_viscosity_parameters[p, 0], bulk_viscosity_parameters[p, 1],
                     bulk_viscosity_parameters[p, 2], bulk_viscosity_parameters[p, 3],
@@ -395,7 +399,7 @@ class EmulatorBAND:
             return fpredmean.T
 
 
-    def testEmulatorErrors(self, number_test_points=1):
+    def testEmulatorErrors(self, number_test_points=1,  randomize=False):
         """
         This function uses (nev - number_test_points) points to train the 
         emulator and use number_test_points points to test the emulator in each 
@@ -409,7 +413,11 @@ class EmulatorBAND:
         validation_data_err = []
 
         logging.info("Validation GP emulator ...")
-        event_idx_list = range(self.nev - number_test_points, self.nev)
+        import random
+        if randomize:
+            event_idx_list = random.sample(range(self.nev), number_test_points)
+        else:
+            event_idx_list = range(self.nev - number_test_points, self.nev)
         train_event_mask = [True]*self.nev
         for event_i in event_idx_list:
             train_event_mask[event_i] = False
