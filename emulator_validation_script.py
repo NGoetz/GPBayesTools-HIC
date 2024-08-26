@@ -34,13 +34,13 @@ def train_multiple_emulators(training_set, model_par, number_test_points, logFla
     emu2 = EmulatorBAND(training_set, model_par, method='PCSK', logTrafo=logFlag, parameterTrafoPCA=parameterTrafoPCAFlag)
     #emu3 = Emulator(training_set, model_par, npc = 4, logTrafo=logFlag, parameterTrafoPCA=parameterTrafoPCAFlag)
 
-    output_emu1 = emu1.testEmulatorErrors(number_test_points=number_test_points)
+    output_emu1 = emu1.testEmulatorErrors(number_test_points=number_test_points, randomize=True)
     emu_pred_1 = output_emu1[0]
     emu_pred_err_1 = output_emu1[1]
     vali_data_1 = output_emu1[2]
     vali_data_err_1 = output_emu1[3]
 
-    output_emu2 = emu2.testEmulatorErrors(number_test_points=number_test_points)
+    output_emu2 = emu2.testEmulatorErrors(number_test_points=number_test_points,, randomize=True)
     emu_pred_2 = output_emu2[0]
     emu_pred_err_2 = output_emu2[1]
     vali_data_2 = output_emu2[2]
@@ -55,11 +55,18 @@ def train_multiple_emulators(training_set, model_par, number_test_points, logFla
     nObs = vali_data_1.shape[1]  # Assuming all datasets have the same number of observables
 
     rms_abs_pred_err1 = rms_abs_prediction_err(emu_pred_1,vali_data_1)
+    print("Error 1 "+logFlag+" "+parameterTrafoPCAFlag)
+    print(np.mean(rms_abs_pred_err1))
     rms_abs_pred_err2 = rms_abs_prediction_err(emu_pred_2,vali_data_2)
+    print("Error 2"+logFlag+" "+parameterTrafoPCAFlag)
+    print(np.mean(rms_abs_pred_err2))
     #rms_abs_pred_err3 = rms_abs_prediction_err(emu_pred_3,vali_data_3)
     honesty_1 = how_honest_is_GP(emu_pred_1,emu_pred_err_1,vali_data_1)
+    print("Honesty 1"+logFlag+" "+parameterTrafoPCAFlag)
+    print(np.mean(honesty_1))
     honesty_2 = how_honest_is_GP(emu_pred_2,emu_pred_err_2,vali_data_2)
-    #honesty_3 = how_honest_is_GP(emu_pred_3,emu_pred_err_3,vali_data_3)
+    print("Honesty 2"+logFlag+" "+parameterTrafoPCAFlag)
+    print(np.mean(honesty_2))
 
     return (rms_abs_pred_err1,rms_abs_pred_err2), (honesty_1,honesty_2)
 
@@ -104,7 +111,7 @@ def read_multiple_emulator_errors_files(number_test_points_list,foldername,filen
         # filename3 = f"./{foldername}/{filename}_{i}_pred_err_obs_3.dat"
         # data3 = read_emulator_file_errors(filename3)
         # data_list3.append(data3)
-    
+
     data_list4 = []
     data_list5 = []
 
@@ -142,7 +149,7 @@ if not os.path.exists(path_output_pca):
     os.makedirs(path_output_pca)
 
 
-training_set = ['full_base_cut_3.pkl']
+training_set = ['full_base.pkl']
 output_file_list = []
 for file in training_set:
     name=file.split('/')[-1].split('.p')[0]
