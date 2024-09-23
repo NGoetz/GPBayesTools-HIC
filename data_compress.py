@@ -22,12 +22,13 @@ num_points=500
 
 
 parent=path.abspath('../actual/')
+pparent=path.abspath('../')
 #generate the data pickles
 path_data = parent+'/merged_directory'
 path_configs = parent+'/configs'
 path_output = parent+'/latent_pickled/'
-path_output_exp = parent+'/exp/'
-path_data_exp=parent+'/exp_input/0'
+path_output_exp = pparent+'/exp/'
+path_data_exp=pparent+'/exp_raw/experimental_results/'
 datasets = [
     'exp_19.6_05_eta_spectra', 'exp_200_05_y_spectra_piminus',
     'exp_19.6_05_integrated', 'exp_200_05_y_spectra_piplus',
@@ -150,7 +151,7 @@ def pickle_data_in_from_to(path_output, start, end, eta_cut=None, star_pT_cut=No
                 if not exp:
                     current_path = path_data +"/"+i_str+"/"+dataset.replace("exp", i_str)
                 else:
-                    current_path = path_data_exp +"/"+i_str+"/"+dataset
+                    current_path = path_data_exp +dataset
                 
                 df = pd.read_csv(current_path)
                 if eta_cut is not None and ("eta" in dataset or "y_spectra" in dataset or "phobos" in dataset):
@@ -184,7 +185,7 @@ def pickle_data_in_from_to(path_output, start, end, eta_cut=None, star_pT_cut=No
                     if not exp:
                         current_path = path_data +"/"+i_str+"/"+dataset.replace("exp", i_str)
                     else:
-                        current_path = path_data_exp +"/"+i_str+"/"+dataset 
+                        current_path = path_data_exp +dataset 
                     df = pd.read_csv(current_path)
                     obs_1.extend(df[key].values)
                     obs_2.extend(df[key+"_error"].values)
@@ -198,7 +199,7 @@ def pickle_data_in_from_to(path_output, start, end, eta_cut=None, star_pT_cut=No
     eta_cut_str = str(eta_cut) if eta_cut is not None else "noetacut"
     star_pT_cut_str = str(star_pT_cut) if star_pT_cut is not None else "nostarptcut"
     
-    outname = f"data_{energy_str}_{system_str}_{data}_{eta_cut_str}_{star_pT_cut_str}"
+    outname = f"data:{energy_str}:{system_str}:{data}:{eta_cut_str}:{star_pT_cut_str}"
     if not exp:
         with open( path_output+outname+".pkl", 'wb') as f:
             pickle.dump(dict_df_full, f)
@@ -209,7 +210,7 @@ def pickle_data_in_from_to(path_output, start, end, eta_cut=None, star_pT_cut=No
 
 def parse_outname_and_generate_file(path_output, outname, start, end, exp=False):
     # Split the outname into its components
-    parts = outname.split('_')
+    parts = outname.split(':')
     
     # Extract the components
     energy_str = parts[1]

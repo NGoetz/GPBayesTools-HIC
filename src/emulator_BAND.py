@@ -81,7 +81,6 @@ class EmulatorBAND:
         logging.info("Not discarding parameters with high errors. To enable this, we have to add cuts!")
         for event_id in sorted_event_ids:
             temp_data = dataDict[event_id]["obs"].transpose()
-            statErrMax = np.abs((temp_data[:, 1]/(temp_data[:, 0]+1e-16))).max()
             if False:
                 logging.info("Discard Parameter {}, stat err = {:.2f}".format(
                                                     event_id, statErrMax))
@@ -375,13 +374,13 @@ class EmulatorBAND:
                             shear_viscosity_parameters[p, 2], shear_viscosity_parameters[p,0],shear_viscosity_parameters[p,1],shear_viscosity_parameters[p,3], mu_B, T) 
                         parameter_functions_mu_B.append(parameter_function)
                     parameter_functions_T.append(parameter_functions_mu_B)
-            data_functions.append(parameter_functions_T)
+                data_functions.append(parameter_functions_T)
             data_functions = np.array(data_functions)
 
             data_functions_2d = data_functions.reshape(data_functions.shape[0], -1)
 
             scaled_data_functions = self.paramTrafoScaler_shear.fit_transform(data_functions_2d)
-            projected_parameters = self.paramTrafoPCA_shear.transform(scaled_data)
+            projected_parameters = self.paramTrafoPCA_shear.transform(scaled_data_functions)
 
             new_theta = np.delete(new_theta, self.indices_eta_s_parameters, axis=1)
             new_theta = np.concatenate((new_theta, projected_parameters), axis=1)
