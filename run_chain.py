@@ -19,16 +19,17 @@ def main():
     args = parser.parse_args()
 
     training_set = args.training_set
-    print(training_set)
+    #print(training_set)
     parent="../actual"
-    
+
     model_par = '../training_points/configs/config_AuAu_200_bulk_scan_central.yaml'
     data_path = parent+"/latent_train_full/"
     closure_test=parent+"/latent_test/"
+    closure_test_498=parent+"/latent_test_498/"
     for outname in training_set:
         # Remove the file extension to get the outname
         outname = outname.replace('.pkl', '')
-        parse_outname_and_generate_file(data_path, outname, 0, 500, exp=True)
+        parse_outname_and_generate_file(data_path, outname, 0, 750, exp=True)
     output_file_list = []
     for file in training_set:
         name=file.split('/')[-1].split('.p')[0]
@@ -52,7 +53,7 @@ def main():
             tag_clo="full"
             path_output = path_output_full
             path_mcmc = path_mcmc_full
-    
+
         if log:
             tag=tag+"_log_"
             if PCA:
@@ -71,7 +72,7 @@ def main():
                 path_mcmc=path_mcmc+'no_log/pca/'
             else:
                 tag=tag+"nopca_"
-                path_emu=path_output+'no_log/no_pca/'  
+                path_emu=path_output+'no_log/no_pca/'
                 path_mcmc=path_mcmc+'no_log/no_pca/'
 
         if method=='PCGP':
@@ -82,10 +83,12 @@ def main():
             path_mcmc=path_mcmc+'PCSK/'
 
         if closure:
-            parse_outname_and_generate_file(closure_test, tr_set.replace(".pkl",''), 499, 500, exp=False)
+            parse_outname_and_generate_file(closure_test, tr_set.replace(".pkl",''), 749, 750, exp=False)
             exp_path = closure_test+ tr_set.replace(".pkl",'') +".pkl"
+            #parse_outname_and_generate_file(closure_test_498, tr_set.replace(".pkl",''), 598, 599, exp=False)
+            #exp_path2 = closure_test_498+ tr_set.replace(".pkl",'') +".pkl"
         else:
-            parse_outname_and_generate_file("../exp/", tr_set.replace(".pkl",''), 499, 500, exp=True)
+            parse_outname_and_generate_file("../exp/", tr_set.replace(".pkl",''), 749, 750, exp=True)
             exp_path = "../exp/"+ tr_set.replace(".pkl",'') +".pkl"
 
         path_emu = path_emu + tr_set.replace('.pkl', '') + tag + method
@@ -111,7 +114,7 @@ def main():
             n_max_steps = 200
             random_state = 42
 
-            n_total = 40000
+            n_total = 60000
             n_evidence = 40000
 
             pool = 40
@@ -127,8 +130,41 @@ def main():
         else:
             print(f"MCMC result file {output_file} already exists. Skipping MCMC run.")
 
-                                    
-        
+        if closure:
+            mcmc_path = path_mcmc + tr_set.replace('.pkl', '') + tag + method + "_" + tag_clo+'.pkl'
+            output_file = path_mcmc + tr_set.replace('.pkl', '') + tag + method + "_" + tag_clo + ".pkl"
+
+            # Check if the output file already exists
+            if not os.path.exists(output_file):
+                mymcmc = Chain(mcmc_path=mcmc_path, expdata_path=exp_path, model_parafile=model_par)
+
+                mymcmc.loadEmulator([path_emu])
+
+                os.environ["OMP_NUM_THREADS"] = "1"
+                os.environ["RDMAV_FORK_SAFE"] = "1"
+
+                n_effective = 8000
+                n_active = 4000
+                n_prior = 32000
+                sample = "tpcn"
+                n_max_steps = 200
+                random_state = 42
+
+                n_total = 60000
+                n_evidence = 40000
+
+                pool = 40
+
+                sampler = mymcmc.run_pocoMC(n_effective=n_effective, n_active=n_active,
+                                            n_prior=n_prior, sample=sample,
+                                            n_max_steps=n_max_steps, random_state=random_state,
+                                            n_total=n_total, n_evidence=n_evidence, pool=pool)
+
+                print("Run chain for ", tr_set, " with log_transform =", log, " and pca =", PCA, " and method =", method, " and closure =", closure)
+                with open(output_file, "wb") as f:
+                    pickle.dump(sampler, f)
+
+
         print("Ran chain for ", tr_set, " with log_transform =", log, " and pca =", PCA, " and method =", method, " and closure =", closure)
         with open(path_mcmc + tr_set.replace('.pkl', '') + tag + method + "_" + tag_clo+".pkl", "rb") as f:
             chain = pickle.load(f)
@@ -136,24 +172,32 @@ def main():
             print(chain['log_likelihood'].shape)
 
     print("Start Chain")
-    
+    print("Only nolog nopca PCGP!")
     for tr_set in training_set:
-        run_chain(tr_set, log=False, PCA=False, method='PCGP', closure=True)
-        run_chain(tr_set, log=True, PCA=False, method='PCGP', closure=True)
-        
-        
-        run_chain(tr_set, log=False, PCA=False, method='PCSK', closure=True)
-        run_chain(tr_set, log=True, PCA=False, method='PCSK', closure=True)
-    
-        run_chain(tr_set, log=False, PCA=False, method='PCGP', closure=False)
-        run_chain(tr_set, log=True, PCA=False, method='PCGP', closure=False)
-        
-        
-        run_chain(tr_set, log=False, PCA=False, method='PCSK', closure=False)
-        run_chain(tr_set, log=True, PCA=False, method='PCSK', closure=False)
-        
+        #
+        # run_chain(tr_set, log=True, PCA=False, method='PCGP', closure=True)
 
-        # run_chain(tr_set, log=False, PCA=True, method='PCSK', closure=True) 
+
+        # run_chain(tr_set, log=False, PCA=False, method='PCSK', closure=True)
+        # run_chain(tr_set, log=True, PCA=False, method='PCSK', closure=True)
+
+        # run_chain(tr_set, log=False, PCA=False, method='PCGP', closure=False)
+        # run_chain(tr_set, log=False, PCA=False, method='PCGP', closure=True)
+        # run_chain(tr_set, log=False, PCA=False, method='PCSK', closure=False)
+        # run_chain(tr_set, log=False, PCA=False, method='PCSK', closure=True)
+
+        run_chain(tr_set, log=True, PCA=False, method='PCGP', closure=False)
+        run_chain(tr_set, log=True, PCA=False, method='PCGP', closure=True)
+        run_chain(tr_set, log=True, PCA=False, method='PCSK', closure=False)
+        run_chain(tr_set, log=True, PCA=False, method='PCSK', closure=True)
+        # run_chain(tr_set, log=True, PCA=False, method='PCGP', closure=False)
+
+
+        # run_chain(tr_set, log=False, PCA=False, method='PCSK', closure=False)
+        # run_chain(tr_set, log=True, PCA=False, method='PCSK', closure=False)
+
+
+        # run_chain(tr_set, log=False, PCA=True, method='PCSK', closure=True)
         # run_chain(tr_set, log=True, PCA=True, method='PCSK', closure=True)
         #run_chain(tr_set, log=False, PCA=True, method='PCGP', closure=True)
         # run_chain(tr_set, log=True, PCA=True, method='PCGP', closure=False) #data:7.7_200:05:base:noetacut:nostarptcut_log_pca_PCGP_full.pkl this is trouble

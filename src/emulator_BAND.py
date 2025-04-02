@@ -7,7 +7,7 @@ explicitly --- the emulators will be trained automatically when needed).  Run
 ``python -m src.emulator --help`` for usage information.
 
 Uses the `Gaussian process regression
-<https://surmise.readthedocs.io/en/latest/index.html>`_ implemented by the BAND 
+<https://surmise.readthedocs.io/en/latest/index.html>`_ implemented by the BAND
 collaboration.
 """
 
@@ -23,14 +23,14 @@ from . import cachedir, parse_model_parameter_file
 
 class EmulatorBAND:
     """
-    Multidimensional Gaussian Process emulator wrapper for the GP emulators of 
+    Multidimensional Gaussian Process emulator wrapper for the GP emulators of
     the BAND collaboration.
     """
 
-    def __init__(self, training_set_path=".", parameter_file="ABCD.txt", 
+    def __init__(self, training_set_path=".", parameter_file="ABCD.txt",
                  method='PCGP',logTrafo=False,parameterTrafoPCA=False):
         self.method_ = method
-        self.logTrafo_ = logTrafo 
+        self.logTrafo_ = logTrafo
         self.parameterTrafoPCA_ = parameterTrafoPCA
         self._load_training_data_pickle(training_set_path)
 
@@ -42,7 +42,12 @@ class EmulatorBAND:
             self.design_max.append(val[2])
         self.design_min = np.array(self.design_min)
         self.design_max = np.array(self.design_max)
-
+        print(self.design_min)
+        print(self.design_max)
+        print(self.design_points.shape[1])
+        print(self.model_data.shape)
+        print(training_set_path)
+        print(parameter_file)
         self.nev, self.nobs = self.model_data.shape
         self.nparameters = self.design_points.shape[1]
 
@@ -76,33 +81,42 @@ class EmulatorBAND:
 
         # Sort keys in ascending order
         sorted_event_ids = sorted(dataDict.keys(), key=lambda x: int(x))
-
+        #print(sorted_event_ids)
         discarded_points = 0
         logging.info("Not discarding parameters with high errors. To enable this, we have to add cuts!")
         for event_id in sorted_event_ids:
             temp_data = dataDict[event_id]["obs"].transpose()
-            if False:
-                logging.info("Discard Parameter {}, stat err = {:.2f}".format(
-                                                    event_id, statErrMax))
+            #if event_id == 0:
+            # print("JJJJJJJJJJJJJJJJJ")
+            # print(temp_data)
+            # print(temp_data.shape)
+            if np.any(np.isnan(temp_data[:, 0])):
+                #print("huhu")
+                logging.info("Discard Parameter "+str(event_id))
                 discarded_points += 1
                 continue
             self.design_points.append(dataDict[event_id]["parameter"])
             #print(dataDict[event_id]["parameter"])
             if self.logTrafo_ == False:
                 self.model_data.append(temp_data[:, 0])
+                # print(event_id)
+                # print(temp_data[:, 0].shape)
+                # print(np.array(self.model_data).shape)
+                # print("-----")
                 self.model_data_err.append(temp_data[:, 1])
             else:
                 self.model_data.append(np.log(np.abs(temp_data[:, 0]) + 1e-30))
                 self.model_data_err.append(
                     np.abs(temp_data[:, 1]/(temp_data[:, 0] + 1e-30))
                 )
+
         self.design_points = np.array(self.design_points)
         self.model_data = np.array(self.model_data)
         self.model_data_err = np.nan_to_num(np.abs(np.array(self.model_data_err)))
         logging.info("All training data are loaded.")
         logging.info("Training dataset size: {}, discarded points: {}".format(
             len(self.model_data),discarded_points))
-        
+
     def parametrization_zeta_over_s_vs_e(self, zetaS0, zetaSPeakEpsilon, zetaSSigmaMinus, zetaSSigmaPlus, e):
         zetaSScaleBeta=0.103
         if e < zetaSPeakEpsilon:
@@ -173,7 +187,7 @@ class EmulatorBAND:
                     # Evaluate the function for each mu_B and T value
                     parameter_function = self.parametrization_eta_over_s_vs_mu_B_T(
                         shear_viscosity_parameters[p, 5], shear_viscosity_parameters[p, 4],
-                        shear_viscosity_parameters[p, 2], shear_viscosity_parameters[p,0],shear_viscosity_parameters[p,1],shear_viscosity_parameters[p,3], mu_B, T) 
+                        shear_viscosity_parameters[p, 2], shear_viscosity_parameters[p,0],shear_viscosity_parameters[p,1],shear_viscosity_parameters[p,3], mu_B, T)
                     parameter_functions_mu_B.append(parameter_function)
                 parameter_functions_T.append(parameter_functions_mu_B)
             data_functions.append(parameter_functions_T)
@@ -211,6 +225,7 @@ class EmulatorBAND:
 
 
     def trainEmulator(self, event_mask):
+        np.random.seed(42)
         logging.info('Performing emulator training ...')
         nev, nobs = self.model_data[event_mask, :].shape
         logging.info(
@@ -229,7 +244,7 @@ class EmulatorBAND:
                             method='PCGP',
                             args={'warnings': True}
                             )
-            
+
         elif self.method_ == 'PCSK':
             sim_sdev = self.model_data_err[event_mask, :].T
 
@@ -298,7 +313,7 @@ class EmulatorBAND:
                         # Evaluate the function for each mu_B and T value
                         parameter_function = self.parametrization_eta_over_s_vs_mu_B_T(
                             shear_viscosity_parameters[p, 5], shear_viscosity_parameters[p, 4],
-                            shear_viscosity_parameters[p, 2], shear_viscosity_parameters[p,0],shear_viscosity_parameters[p,1],shear_viscosity_parameters[p,3], mu_B, T) 
+                            shear_viscosity_parameters[p, 2], shear_viscosity_parameters[p,0],shear_viscosity_parameters[p,1],shear_viscosity_parameters[p,3], mu_B, T)
                         parameter_functions_mu_B.append(parameter_function)
                     parameter_functions_T.append(parameter_functions_mu_B)
                 data_functions.append(parameter_functions_T)
@@ -371,7 +386,7 @@ class EmulatorBAND:
                         # Evaluate the function for each mu_B and T value
                         parameter_function = self.parametrization_eta_over_s_vs_mu_B_T(
                             shear_viscosity_parameters[p, 5], shear_viscosity_parameters[p, 4],
-                            shear_viscosity_parameters[p, 2], shear_viscosity_parameters[p,0],shear_viscosity_parameters[p,1],shear_viscosity_parameters[p,3], mu_B, T) 
+                            shear_viscosity_parameters[p, 2], shear_viscosity_parameters[p,0],shear_viscosity_parameters[p,1],shear_viscosity_parameters[p,3], mu_B, T)
                         parameter_functions_mu_B.append(parameter_function)
                     parameter_functions_T.append(parameter_functions_mu_B)
                 data_functions.append(parameter_functions_T)
@@ -400,8 +415,8 @@ class EmulatorBAND:
 
     def testEmulatorErrors(self, number_test_points=1,  randomize=False):
         """
-        This function uses (nev - number_test_points) points to train the 
-        emulator and use number_test_points points to test the emulator in each 
+        This function uses (nev - number_test_points) points to train the
+        emulator and use number_test_points points to test the emulator in each
         iteration.
         It returns the emulator predictions, their errors,
         the actual values of observables and their errors as four arrays.
@@ -448,13 +463,13 @@ class EmulatorBAND:
         validation_data = np.array(validation_data).reshape(-1, self.nobs)
         validation_data_err = np.array(validation_data_err).reshape(-1, self.nobs)
 
-        return (emulator_predictions, emulator_predictions_err, 
+        return (emulator_predictions, emulator_predictions_err,
                     validation_data, validation_data_err)
-    
+
     def testEmulatorErrorsWithTrainingPoints(self, number_test_points=1):
         """
-        This function uses number_test_points points to train the 
-        emulator and the same points to test the emulator in each 
+        This function uses number_test_points points to train the
+        emulator and the same points to test the emulator in each
         iteration. The resulting errors should be very small.
         It returns the emulator predictions, their errors,
         the actual values of observables and their errors as four arrays.
@@ -497,7 +512,7 @@ class EmulatorBAND:
         validation_data = np.array(validation_data).reshape(-1, self.nobs)
         validation_data_err = np.array(validation_data_err).reshape(-1, self.nobs)
 
-        return (emulator_predictions, emulator_predictions_err, 
+        return (emulator_predictions, emulator_predictions_err,
                     validation_data, validation_data_err)
 
 

@@ -16,7 +16,7 @@ import numpy as np
 
 ####################
 #GLOBAL VARIABLES
-num_points=500
+num_points=750
 #num_points=4
 ####################
 
@@ -30,7 +30,7 @@ path_output = parent+'/latent_pickled/'
 path_output_exp = pparent+'/exp/'
 path_data_exp=pparent+'/exp_raw/experimental_results/'
 datasets = [
-    'exp_19.6_05_eta_spectra', 'exp_200_05_y_spectra_piminus',
+    'exp_19.6_05_eta_spectra','exp_19.6_05_stareta_spectra', 'exp_200_05_y_spectra_piminus',
     'exp_19.6_05_integrated', 'exp_200_05_y_spectra_piplus',
     'exp_19.6_05_pT_spectra_kminus', 'exp_200_1525_eta_spectra',
     'exp_19.6_05_pT_spectra_kplus', 'exp_200_1525_phobos_v2_spectra',
@@ -39,7 +39,7 @@ datasets = [
     'exp_19.6_05_pT_spectra_piminus', 'exp_200_2030_phenix_pT_v3_spectra',
     'exp_19.6_05_pT_spectra_piplus', 'exp_200_2030_pT_spectra_kminus',
     'exp_19.6_1525_eta_spectra', 'exp_200_2030_pT_spectra_kplus','exp_200_2030_pT_spectra_p',
-    'exp_19.6_2030_integrated', 'exp_200_2030_pT_spectra_pbar',
+    'exp_19.6_2030_integrated','exp_19.6_2030_stareta_spectra', 'exp_200_2030_pT_spectra_pbar',
     'exp_19.6_2030_pT_spectra_kminus', 'exp_200_2030_pT_spectra_piminus',
     'exp_19.6_2030_pT_spectra_kplus', 'exp_200_2030_pT_spectra_piplus',
     'exp_19.6_2030_pT_spectra_p', 'exp_7.7_05_integrated',
@@ -58,19 +58,18 @@ datasets = [
     'exp_200_05_y_spectra_kminus', 'exp_7.7_2030_pT_spectra_piplus',
     'exp_200_05_y_spectra_kplus', 'exp_7.7_2030_star_v2_pT_spectra'
 ]
+
 integrated_values=[
     "dNdy_kminus",
     "dNdy_kplus",
-    "dNdy_p",
-    "dNdy_pbar",
     "dNdy_piminus",
     "dNdy_piplus",
+    "dNdy_p",
     "meanpT_kminus",
     "meanpT_kplus",
-    "meanpT_p",
-    "meanpT_pbar",
     "meanpT_piminus",
     "meanpT_piplus",
+    "meanpT_p",
     "star_v2",
     "star_v3"
 ]
@@ -94,7 +93,10 @@ def read_config(file):
                 values.append(value)
     return values
 
-def pickle_data_in_from_to(path_output, start, end, eta_cut=None, star_pT_cut=None, data="all", system=None, energy=None, exp=False):
+def pickle_data_in_from_to(path_output, start, end, eta_cut=None, star_pT_cut=None, data="all", system=None, energy=None, exp=False, tau=False):
+    integrated_values_local=integrated_values.copy()
+    if tau:
+        integrated_values_local=integrated_values_local+["tau"]
     dict_df_full = {}
     datasets_local = datasets.copy()
     if exp:
@@ -105,7 +107,7 @@ def pickle_data_in_from_to(path_output, start, end, eta_cut=None, star_pT_cut=No
             datasets_local = [d for d in datasets_local if any(s in d for s in system)]
         else:
             datasets_local = [d for d in datasets_local if system in d]
-    
+
     if energy is not None:
         if isinstance(energy, list):
             datasets_local = [d for d in datasets_local if any(e in d for e in energy)]
@@ -113,29 +115,33 @@ def pickle_data_in_from_to(path_output, start, end, eta_cut=None, star_pT_cut=No
             datasets_local = [d for d in datasets_local if energy in d]
     match data:
         case "base-wo-phobos":
-            datasets_local = [d for d in datasets_local if ("phobos" not in d and "eta" not in d and "y_spectra" not in d and "pT_spectra" not in d and "phenix" not in d and "star_v2_pT_spectra" not in d)]
+            datasets_local = [d for d in datasets_local if ("phobos" not in d and "_eta" not in d and "y_spectra" not in d and "pT_spectra" not in d and "phenix" not in d and "star_v2_pT_spectra" not in d and "stareta" not in d)]
         case "base":
-           datasets_local = [d for d in datasets_local if ("y_spectra" not in d and "pT_spectra" not in d and "phenix" not in d and "star_v2_pT_spectra" not in d)]
+           datasets_local = [d for d in datasets_local if ("y_spectra" not in d and "pT_spectra" not in d and "stareta" not in d and "phenix" not in d and "star_v2_pT_spectra" not in d)]
         case "base-and-pT-spectra":
-           datasets_local = [d for d in datasets_local if ("y_spectra" not in d and "phenix" not in d and "star_v2_pT_spectra" not in d)] 
+           datasets_local = [d for d in datasets_local if ("y_spectra" not in d and "phenix" not in d and "stareta" not in d and "star_v2_pT_spectra" not in d)]
         case "base-and-y-spectra":
-            datasets_local = [d for d in datasets_local if ( "pT_spectra" not in d and "phenix" not in d and "star_v2_pT_spectra" not in d)]
+            datasets_local = [d for d in datasets_local if ( "pT_spectra" not in d and "phenix" not in d and "stareta" not in d and "star_v2_pT_spectra" not in d)]
+        case "base-wo-eta-19.6":
+           datasets_local = [d for d in datasets_local if ("y_spectra" not in d and "pT_spectra" not in d and "stareta" not in d and "phenix" not in d and "star_v2_pT_spectra" not in d and not ("eta" in d and "19.6" in d))]
         case "base-and-phenix":
-            datasets_local = [d for d in datasets_local if ("y_spectra" not in d and "pT_spectra" not in d  and "star_v2_pT_spectra" not in d)]
+            datasets_local = [d for d in datasets_local if ("y_spectra" not in d and "pT_spectra" not in d and "stareta" not in d and "star_v2_pT_spectra" not in d)]
         case "base-and-v2pT":
-            datasets_local = [d for d in datasets_local if ("y_spectra" not in d and "pT_spectra" not in d and "phenix" not in d)  or ( "star_v2_pT_spectra" in d )]
+            datasets_local = [d for d in datasets_local if ("y_spectra" not in d and "pT_spectra" not in d and "stareta" not in d and "phenix" not in d)  or ( "star_v2_pT_spectra" in d )]
         case "base-and-phenix-and-v2pT":
-            datasets_local = [d for d in datasets_local if ("y_spectra" not in d and "pT_spectra" not in d ) or ( "star_v2_pT_spectra" in d )]
+            datasets_local = [d for d in datasets_local if ("y_spectra" not in d and "stareta" not in d and "pT_spectra" not in d ) or ( "star_v2_pT_spectra" in d )]
         case "base-and-phenix-and-pT":
-            datasets_local = [d for d in datasets_local if ("y_spectra" not in d and "star_v2_pT_spectra" not in d )]
+            datasets_local = [d for d in datasets_local if ("y_spectra" not in d and "stareta" not in d and "star_v2_pT_spectra" not in d )]
         case "base-and-v2pT-and-pT":
-            datasets_local = [d for d in datasets_local if ("y_spectra" not in d and "phenix" not in d )]
+            datasets_local = [d for d in datasets_local if ("y_spectra" not in d and "stareta" not in d and "phenix" not in d )]
         case "base-and-all-but-y":
-            datasets_local = [d for d in datasets_local if ("y_spectra" not in d )]
+            datasets_local = [d for d in datasets_local if ("y_spectra" not in d ) and "stareta" not in d]
         case "base-and-y-and-pT-spectra":
-            datasets_local = [d for d in datasets_local if ("phenix" not in d and "star_v2_pT_spectra" not in d)]
+            datasets_local = [d for d in datasets_local if ("phenix" not in d and "star_v2_pT_spectra" not in d and "stareta" not in d)]
         case "all":
             pass
+        case "base-star-eta":
+            datasets_local = [d for d in datasets_local if ("y_spectra" not in d and "pT_spectra" not in d and "phenix" not in d and "star_v2_pT_spectra" not in d) and not ("_eta_spectra" in d and "19.6" in d)]
         case _:
             raise ValueError("Unexpected case encountered")
     for i in range(start, end):
@@ -152,15 +158,41 @@ def pickle_data_in_from_to(path_output, start, end, eta_cut=None, star_pT_cut=No
                     current_path = path_data +"/"+i_str+"/"+dataset.replace("exp", i_str)
                 else:
                     current_path = path_data_exp +dataset
-                
+
                 df = pd.read_csv(current_path)
-                if eta_cut is not None and ("eta" in dataset or "y_spectra" in dataset or "phobos" in dataset):
+                if eta_cut is not None and ("eta" in dataset or "y_spectra" in dataset):
                     df_filtered = df[abs(df.iloc[:, -3]) < eta_cut]
                     new_obs_1 = df_filtered.iloc[:, -2].tolist()
                     new_obs_2 = df_filtered.iloc[:, -1].tolist()
                     obs_1.extend(new_obs_1)
                     obs_2.extend(new_obs_2)
                     dict_df["lim"].append(df_filtered.shape[0] + dict_df["lim"][-1])
+                elif eta_cut is not None and "phobos" in dataset and exp:
+                    df_filtered = df[abs(df.iloc[:, -4]) < eta_cut]
+                    new_obs_1 = df_filtered.iloc[:, -3].tolist()
+                    new_obs_2 = (np.abs(df_filtered.iloc[:, -1].tolist())+np.abs(df_filtered.iloc[:, -2].tolist()))/2.0
+                    obs_1.extend(new_obs_1)
+                    obs_2.extend(new_obs_2)
+                    dict_df["lim"].append(df_filtered.shape[0] + dict_df["lim"][-1])
+                elif eta_cut is None and "phobos" in dataset and exp:
+                    new_obs_1 = df.iloc[:, -3].tolist()
+                    new_obs_2 = (np.abs(df.iloc[:, -1].tolist())+np.abs(df.iloc[:, -2].tolist()))/2.0
+                    obs_1.extend(new_obs_1)
+                    obs_2.extend(new_obs_2)
+                    dict_df["lim"].append(df.shape[0] + dict_df["lim"][-1])
+                elif eta_cut is not None and "phobos" in dataset and not exp:
+                    df_filtered = df[abs(df.iloc[:, -3]) < eta_cut]
+                    new_obs_1 = df_filtered.iloc[:, -2].tolist()
+                    new_obs_2 = np.abs(df_filtered.iloc[:, -1].tolist())
+                    obs_1.extend(new_obs_1)
+                    obs_2.extend(new_obs_2)
+                    dict_df["lim"].append(df_filtered.shape[0] + dict_df["lim"][-1])
+                elif eta_cut is None and "phobos" in dataset and not exp:
+                    new_obs_1 = df.iloc[:, -2].tolist()
+                    new_obs_2 = np.abs(df.iloc[:, -1].tolist())
+                    obs_1.extend(new_obs_1)
+                    obs_2.extend(new_obs_2)
+                    dict_df["lim"].append(df.shape[0] + dict_df["lim"][-1])
                 elif star_pT_cut is not None and "star_v2_pT_spectra" in dataset:
                     df_filtered = df[abs(df.iloc[:, -3]) < star_pT_cut]
                     new_obs_1 = df_filtered.iloc[:, -2].tolist()
@@ -179,16 +211,19 @@ def pickle_data_in_from_to(path_output, start, end, eta_cut=None, star_pT_cut=No
                 if any(np.isnan(new_obs_1)):
                     print(f"Warning: NaN found in obs_1 for dataset {dataset} with parameter {dict_df['parameter']}")
                 dict_df["name"].append(dataset)
-                
+
             elif "integrated" in dataset:
-                for key in integrated_values:
+                for key in integrated_values_local:
+                    factor=1.
+                    if ("dNdy_p" in key or "meanpt_p" in key) and ("pi" not in key) and "200" in dataset:
+                        continue
                     if not exp:
                         current_path = path_data +"/"+i_str+"/"+dataset.replace("exp", i_str)
                     else:
-                        current_path = path_data_exp +dataset 
+                        current_path = path_data_exp +dataset
                     df = pd.read_csv(current_path)
-                    obs_1.extend(df[key].values)
-                    obs_2.extend(df[key+"_error"].values)
+                    obs_1.extend(df[key].values*factor)
+                    obs_2.extend(df[key+"_error"].values*factor)
                     dict_df["name"].append(dataset+"_"+key)
                     dict_df["lim"].append(df.shape[0]+dict_df["lim"][-1])
         dict_df["obs"] = np.vstack((obs_1, obs_2))
@@ -198,8 +233,10 @@ def pickle_data_in_from_to(path_output, start, end, eta_cut=None, star_pT_cut=No
     system_str = "_".join(system) if system else "allsystems"
     eta_cut_str = str(eta_cut) if eta_cut is not None else "noetacut"
     star_pT_cut_str = str(star_pT_cut) if star_pT_cut is not None else "nostarptcut"
-    
+
     outname = f"data:{energy_str}:{system_str}:{data}:{eta_cut_str}:{star_pT_cut_str}"
+    if tau:
+        outname=outname+":tau"
     if not exp:
         with open( path_output+outname+".pkl", 'wb') as f:
             pickle.dump(dict_df_full, f)
@@ -208,31 +245,30 @@ def pickle_data_in_from_to(path_output, start, end, eta_cut=None, star_pT_cut=No
             pickle.dump(dict_df_full, f)
 
 
-def parse_outname_and_generate_file(path_output, outname, start, end, exp=False):
+def parse_outname_and_generate_file(path_output, outname, start, end, exp=False, tau=False):
     # Split the outname into its components
     parts = outname.split(':')
-    
+
     # Extract the components
     energy_str = parts[1]
     system_str = parts[2]
     data = parts[3]
     eta_cut_str = parts[4]
     star_pT_cut_str = parts[5]
-    
+
     # Convert the components to the appropriate types
     energy = energy_str.split('_') if energy_str != "allenergies" else None
     system = system_str.split('_') if system_str != "allsystems" else None
     eta_cut = float(eta_cut_str) if eta_cut_str != "noetacut" else None
     star_pT_cut = float(star_pT_cut_str) if star_pT_cut_str != "nostarptcut" else None
-    
+
+
     # Check if the file already exists
     filepath = os.path.join(path_output, outname + ".pkl")
 
     if not os.path.exists(filepath):
         # Call the original function with the parsed arguments
-        pickle_data_in_from_to(path_output, start, end, eta_cut, star_pT_cut, data, system, energy, exp)
+        #print("no p data")
+        pickle_data_in_from_to(path_output, start, end, eta_cut, star_pT_cut, data, system, energy, exp, tau)
     else:
         print(f"File {filepath} already exists.")
-
-
-

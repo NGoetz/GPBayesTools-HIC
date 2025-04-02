@@ -20,6 +20,7 @@ from src.emulator_BAND import EmulatorBAND
 parent="../actual"
 model_par = parent+'/config_AuAu_200_bulk_scan_central.yaml'
 data_path = parent+"/latent_train_full/"
+exp_path="exp/"
 #data_path_val = parent+"/latent_train_val/"
 
 
@@ -34,7 +35,11 @@ def main():
     for outname in training_set:
         # Remove the file extension to get the outname
         outname = outname.replace('.pkl', '')
-        parse_outname_and_generate_file(data_path, outname, 0, 500)
+        if "tau" in outname:
+            parse_outname_and_generate_file(data_path, outname, 0,750,False, True)
+            parse_outname_and_generate_file(exp_path, outname, 0,750,True, True)
+        else:
+            parse_outname_and_generate_file(data_path, outname, 0, 750)
     output_file_list = []
     for file in training_set:
         name=file.split('/')[-1].split('.p')[0]
@@ -66,7 +71,7 @@ def main():
             else:
                 tag=tag+"nopca_"
                 path_output_val=path_output_val+'no_log/no_pca/'
-                path_output_full=path_output_full+'no_log/no_pca/'  
+                path_output_full=path_output_full+'no_log/no_pca/'
 
         if pcgp:
             path_output_full=path_output_full+'PCGP/'
@@ -88,7 +93,7 @@ def main():
 
             trainEventMask = [True]*emu1.nev
             emu1.trainEmulator(trainEventMask)
-            
+
             with open(full_emulator_path, 'wb') as f:
                 dill.dump(emu1, f)
         else:
@@ -112,14 +117,14 @@ def main():
     print("Start Generation")
     with concurrent.futures.ThreadPoolExecutor() as executor:
         for tr_set in training_set:
-            executor.submit(train_emulator(tr_set,  True, False, False))
-            executor.submit(train_emulator(tr_set,   True, True, False))
-            executor.submit(train_emulator(tr_set, True, False, True))
-            executor.submit(train_emulator(tr_set,  True, True, True))
-            executor.submit(train_emulator(tr_set,  False, False, False))
-            executor.submit(train_emulator(tr_set,   False, True, False))
-            executor.submit(train_emulator(tr_set, False, False, True))
-            executor.submit(train_emulator(tr_set,  False, True, True))
+            #executor.submit(train_emulator(tr_set,  True, False, False))
+            executor.submit(train_emulator(tr_set,   True, False, False))
+            # executor.submit(train_emulator(tr_set, True, False, True))
+            # executor.submit(train_emulator(tr_set,  True, True, True))
+            #executor.submit(train_emulator(tr_set,  False, False, False))
+            #executor.submit(train_emulator(tr_set,   False, False, False))
+            # executor.submit(train_emulator(tr_set, False, False, True))
+            # executor.submit(train_emulator(tr_set,  False, True, True))
     print("Generation done")
 
 if __name__ == "__main__":

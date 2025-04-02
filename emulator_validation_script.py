@@ -20,7 +20,7 @@ def main():
     args = parser.parse_args()
 
     training_set = args.training_set
-    
+
     def rms_abs_prediction_err(emu_pred,vali_true):
         rms_abs_pred_err = np.zeros(emu_pred.shape[1])
         for obsIdx in range(emu_pred.shape[1]):
@@ -181,7 +181,7 @@ def main():
     for outname in training_set:
         # Remove the file extension to get the outname
         outname = outname.replace('.pkl', '')
-        parse_outname_and_generate_file(data_path, outname, 0, 500)
+        parse_outname_and_generate_file(data_path, outname, 0, 750)
     output_file_list = []
     for file in training_set:
         name=file.split('/')[-1].split('.p')[0]
@@ -198,10 +198,10 @@ def main():
     with concurrent.futures.ThreadPoolExecutor() as executor:
         for i in [15]:
             for tr_set in range(len(training_set)):
-                executor.submit(train_emulator(tr_set, i, path_output, False, False))
+                #executor.submit(train_emulator(tr_set, i, path_output, False, False))
                 executor.submit(train_emulator(tr_set, i, path_output_log, True, False))
-                executor.submit(train_emulator(tr_set, i, path_output_pca, False, True))
-                executor.submit(train_emulator(tr_set, i, path_output_pca_log, True, True))
+                # executor.submit(train_emulator(tr_set, i, path_output_pca, False, True))
+                # executor.submit(train_emulator(tr_set, i, path_output_pca_log, True, True))
     print("\n")
     print("Validated Emulators")
 
