@@ -27,18 +27,22 @@ To restart the chain, delete (or rename) the chain HDF5 file.
 import argparse
 import logging
 import pickle
-
+import csv
 from pathlib import Path
 import emcee
 import numpy as np
 from scipy.linalg import lapack
 import dill
-
+import os
 from . import workdir, parse_model_parameter_file
-from .emulator import Emulator
 from .emulator_BAND import EmulatorBAND
 import scipy.optimize as spo
 from .ptemcee_modified.sampler import Sampler as PTemceeSampler
+#print("Imported PTemceeSampler")
+import pocomc
+#print("Imported pocomc")
+from scipy.stats import uniform
+
 
 def mvn_loglike(y, cov):
     """
@@ -147,7 +151,9 @@ class Chain:
             self.max.append(val[2])
         self.min = np.array(self.min)
         self.max = np.array(self.max)
-
+        print(self.label)
+        print(self.min)
+        print(self.max)
         #the volume of the uniform prior
         diff =  self.max - self.min
         self.prior_volume_ = np.prod( diff )
@@ -157,22 +163,14 @@ class Chain:
         logging.info(
             'Loading the experiment data from {} ...'.format(expdata_path))
         self.expdata, self.expdata_cov = self._read_in_exp_data_pickle(expdata_path)
+        # print(self.expdata)
+        # print(self.expdata.shape)
+        # print(self.expdata_cov)
+        # print(self.expdata_cov.shape)
         self.nobs = self.expdata.shape[1]
         self.closureTestFalg = False
         self.emuList = []
         self.chain = False
-
-
-    def trainEmulator(self, model_parafile="./model.dat",
-                      training_data_path="./training_data", npc=10):
-        # setup the emulator
-        logging.info('Initializing emulators for the training model ...')
-        self.emuList.append(
-                Emulator(training_set_path=training_data_path,
-                         parameter_file=model_parafile,
-                         npc=npc)
-        )
-
 
     def loadEmulator(self, emulatorPathList):
         for i, emuPath in enumerate(emulatorPathList):
@@ -217,14 +215,17 @@ class Chain:
         return lp
 
 
-    def log_likelihood(self, X, extra_std_prior_scale=0.001):
+    def log_likelihood(self, X, extra_std_prior_scale=0.001, finite=False):
         """
         Evaluate the likelihood at `X`.
         """
         X = np.array(X, copy=False, ndmin=2)
         lp = np.zeros(X.shape[0])
         inside = np.all( (X > self.min) & (X < self.max), axis=1)
-        lp[~inside] = -np.inf
+        if not finite:
+            lp[~inside] = -np.inf
+        elif finite:
+            lp[~inside] = -1e300
 
         extra_std = X[inside, -1]
 
@@ -238,6 +239,10 @@ class Chain:
             # allocate difference (model - experiment) and covariance arrays
             dY = np.empty([nsamples, self.nobs])
             cov = np.empty([nsamples, self.nobs, self.nobs])
+            # print("Model shape")
+            # print(model_Y.shape)
+            # print("Exp shape")
+            # print(self.expdata.shape)
             dY = model_Y - self.expdata
             # add experiment cov to model cov
             cov = model_cov + self.expdata_cov
@@ -350,7 +355,10 @@ class Chain:
         data_cov = np.zeros((nobs, nobs))
         model_data_err = model_data_err.flatten()
         np.fill_diagonal(data_cov, (model_data_err)** 2)
-      
+        # print("read in ")
+        # print(model_data.shape)
+        # print(model_data_err.shape)
+        # print("---")
         return model_data, data_cov
 
 
@@ -929,6 +937,75 @@ class Chain:
         with open(output_path, 'wb') as file:
             pickle.dump(likelihood_data, file)
 
+
+    def run_pocoMC(self,n_effective=1000,n_active=250,n_prior=2000,sample="tpcn",n_max_steps=200,random_state=42,n_total=5000,n_evidence=5000,pool=None):
+        """
+        This function is based on PocoMC package (version 1.2.1).
+        pocoMC is a Preconditioned Monte Carlo (PMC) sampler that uses 
+        normalizing flows to precondition the target distribution.
+
+        n_effective (int) – The effective sample size maintained during the run (default is n_ess=1000).
+        n_active (int) – The number of active particles (default is n_active=250). It must be smaller than n_ess.
+        n_prior (int) – Number of prior samples to draw (default is n_prior=2*(n_effective//n_active)*n_active).
+        sample (str) – Type of MCMC sampler to use (default is sample="pcn"). 
+            Options are ``"pcn"`` (t-preconditioned Crank-Nicolson) or ``"rwm"`` (Random-walk Metropolis).
+            t-preconditioned Crank-Nicolson is the default and recommended sampler for PMC as it is more efficient and scales better with the number of parameters.
+        n_max_steps (int) – Maximum number of MCMC steps (default is max_steps=10*n_dim).
+        random_state (int or None) – Initial random seed.
+
+        n_total (int) – The total number of effectively independent samples to be collected (default is n_total=5000).
+        n_evidence (int) – The number of importance samples used to estimate the evidence (default is n_evidence=5000). 
+                            If n_evidence=0, the evidence is not estimated using importance sampling and the SMC estimate is used instead. 
+                            If preconditioned=False, the evidence is estimated using SMC and n_evidence is ignored.
+
+        pool (int) – Number of processes to use for parallelisation (default is ``pool=None``). 
+            If ``pool`` is an integer greater than 1, a ``multiprocessing`` pool is created with the specified number of processes.
+
+            When experiencing issues with the fork() function, set the environment variable ``export RDMAV_FORK_SAFE=1``.
+        """
+        logging.info('Generate the prior class for pocoMC ...')
+        prior_distributions = []
+        for i in range(self.ndim):
+            loc = self.min[i]
+            scale = self.max[i] - self.min[i]
+            prior_distributions.append(uniform(loc, scale))
+        prior = pocomc.Prior(prior_distributions)
+        print(prior.bounds)
+
+        logging.info('Starting pocoMC ...')
+        sampler = pocomc.Sampler(prior=prior, likelihood=self.log_likelihood, 
+                                likelihood_kwargs={'finite': True}, 
+                                n_effective=n_effective, n_active=n_active, n_prior=n_prior,
+                                sample=sample, n_max_steps=n_max_steps, 
+                                random_state=random_state, vectorize=True, pool=pool, dynamic=True)
+        sampler.run(n_total=n_total, n_evidence=n_evidence)
+
+        logging.info('Generate the posterior samples ...')
+        samples, weights, logl, logp = sampler.posterior() # Weighted posterior samples
+
+        logging.info('Generate the evidence ...')
+        logz, logz_err = sampler.evidence() # Bayesian model evidence estimate and uncertainty
+
+        filename = os.path.basename(self.mcmc_path)
+
+        # Define the path to the CSV file
+        csv_file_path = '../actual/bayes_evidence.csv'
+
+        # Write the data to the CSV file
+        with open(csv_file_path, mode='a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([filename, logz, logz_err])
+
+
+        print("----")
+        print(self.mcmc_path)
+        print("Log evidence: ", logz)
+        print("Log evidence error: ", logz_err)
+        print("----")
+        logging.info('Writing pocoMC chains to file...')
+        chain_data = {'chain': samples, 'weights': weights, 'logl': logl,
+                        'logp': logp, 'logz': logz, 'logz_err': logz_err, 'log_likelihood': logl}
+        return chain_data
 
 def main():
     parser = argparse.ArgumentParser(
