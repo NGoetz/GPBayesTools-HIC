@@ -1,8 +1,9 @@
 This project is a fork of https://github.com/Hendrik1704/GPBayesTools-HIC
-It is shipped with additional submission scripts for running emulator generation, validation and posterior generation on a  slurm cluster.
-For training, use 'submit_all.sh'. For each training set, the workflow will be executed. The relevant data is parsed from the name of the training set.
 
-For plotting the emulator validation, execute 'read_multiple_emulator_errors_files' in 'EmulatorValidationPlot.ipynb' with the correct input data name and number of validation points. For 'ClosureTest.ipynb', 'Prediction.ipynb', 'Energies.ipynb', 'Rapidity.ipynb' and 'SensitivityAnalysis.ipynb', you have to choose the right path to the emulator and, except for 'SensitivityAnalysis.ipynb', the MCMC file. They have to match in dimensions, of course. All of these need also the path to the pickled experimental data, and an input base config, from which we parse the value range of the parameters of the prior.
+It is shipped with additional submission scripts for running emulator generation, validation and posterior generation on a  slurm cluster.
+For training, use `submit_all.sh`. For each training set, the workflow will be executed. The relevant data is parsed from the name of the training set.
+
+For plotting the emulator validation, execute `read_multiple_emulator_errors_files` in `EmulatorValidationPlot.ipynb` with the correct input data name and number of validation points. For `ClosureTest.ipynb`, `Prediction.ipynb`, `Energies.ipynb`, `Rapidity.ipynb` and `SensitivityAnalysis.ipynb`, you have to choose the right path to the emulator and, except for `SensitivityAnalysis.ipynb`, the MCMC file. They have to match in dimensions, of course. All of these need also the path to the pickled experimental data, and an input base config, from which we parse the value range of the parameters of the prior.
 
 
 Original README
