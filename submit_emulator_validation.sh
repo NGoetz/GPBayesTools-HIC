@@ -2,8 +2,8 @@
 #SBATCH --mem-per-cpu=15000M
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=4
-#SBATCH --partition=debug
-#SBATCH --time=0-00:11:00
+#SBATCH --partition=long
+#SBATCH --time=0-09:00:00
 #SBATCH --mail-user=<goetz@itp.uni-frankfurt.de>
 #SBATCH --mail-type=ALL
 #SBATCH --no-requeue

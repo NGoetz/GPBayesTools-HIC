@@ -34,6 +34,8 @@ cachedir.mkdir(parents=True, exist_ok=True)
 #             pardict.update({key: val})
 #     return pardict
 
+
+
 def parse_model_parameter_file(file):
     with open(file, 'r') as f:
         data = yaml.safe_load(f)
@@ -41,7 +43,9 @@ def parse_model_parameter_file(file):
     pardict = {}
     for software in data:
         if 'Scan_parameters' in data[software]:
-            for parameter in data[software]['Scan_parameters']:
+            parameters = data[software]['Scan_parameters']
+            sorted_parameters = sorted(parameters, key=lambda s: s.lower())  # Sort parameters within this section
+            for parameter in sorted_parameters:
                 keys = parameter.split('.')
                 temp_data = data[software]['Software_keys']
                 for key in keys:
@@ -55,4 +59,14 @@ def parse_model_parameter_file(file):
                         range_list.insert(0, 0.0)  # Add a zero to the beginning of the list
                         pardict[parameter] = range_list
 
-    return pardict
+    # Create a sorted dictionary for each section based on section order
+    sorted_pardict = {}
+    for section in data:
+        print(section)
+        if 'Scan_parameters' in data[section]:
+            # Sort parameters within the section but keep the section order
+            section_parameters = {param: pardict[param] for param in sorted(data[section]['Scan_parameters'],key=lambda s: s.lower()) if param in pardict}
+            sorted_pardict.update(section_parameters)
+
+    print(sorted_pardict)
+    return sorted_pardict

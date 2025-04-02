@@ -27,13 +27,13 @@ To restart the chain, delete (or rename) the chain HDF5 file.
 import argparse
 import logging
 import pickle
-
+import csv
 from pathlib import Path
 import emcee
 import numpy as np
 from scipy.linalg import lapack
 import dill
-
+import os
 from . import workdir, parse_model_parameter_file
 from .emulator_BAND import EmulatorBAND
 import scipy.optimize as spo
@@ -151,7 +151,9 @@ class Chain:
             self.max.append(val[2])
         self.min = np.array(self.min)
         self.max = np.array(self.max)
-
+        print(self.label)
+        print(self.min)
+        print(self.max)
         #the volume of the uniform prior
         diff =  self.max - self.min
         self.prior_volume_ = np.prod( diff )
@@ -237,10 +239,10 @@ class Chain:
             # allocate difference (model - experiment) and covariance arrays
             dY = np.empty([nsamples, self.nobs])
             cov = np.empty([nsamples, self.nobs, self.nobs])
-            print("Model shape")
-            print(model_Y.shape)
-            print("Exp shape")
-            print(self.expdata.shape)
+            # print("Model shape")
+            # print(model_Y.shape)
+            # print("Exp shape")
+            # print(self.expdata.shape)
             dY = model_Y - self.expdata
             # add experiment cov to model cov
             cov = model_cov + self.expdata_cov
@@ -964,15 +966,18 @@ class Chain:
         logging.info('Generate the prior class for pocoMC ...')
         prior_distributions = []
         for i in range(self.ndim):
-            prior_distributions.append(uniform(self.min[i], self.max[i]))
+            loc = self.min[i]
+            scale = self.max[i] - self.min[i]
+            prior_distributions.append(uniform(loc, scale))
         prior = pocomc.Prior(prior_distributions)
+        print(prior.bounds)
 
         logging.info('Starting pocoMC ...')
         sampler = pocomc.Sampler(prior=prior, likelihood=self.log_likelihood, 
                                 likelihood_kwargs={'finite': True}, 
                                 n_effective=n_effective, n_active=n_active, n_prior=n_prior,
                                 sample=sample, n_max_steps=n_max_steps, 
-                                random_state=random_state, vectorize=True, pool=pool)
+                                random_state=random_state, vectorize=True, pool=pool, dynamic=True)
         sampler.run(n_total=n_total, n_evidence=n_evidence)
 
         logging.info('Generate the posterior samples ...')
@@ -980,14 +985,27 @@ class Chain:
 
         logging.info('Generate the evidence ...')
         logz, logz_err = sampler.evidence() # Bayesian model evidence estimate and uncertainty
+
+        filename = os.path.basename(self.mcmc_path)
+
+        # Define the path to the CSV file
+        csv_file_path = '../actual/bayes_evidence.csv'
+
+        # Write the data to the CSV file
+        with open(csv_file_path, mode='a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([filename, logz, logz_err])
+
+
+        print("----")
+        print(self.mcmc_path)
         print("Log evidence: ", logz)
         print("Log evidence error: ", logz_err)
-
+        print("----")
         logging.info('Writing pocoMC chains to file...')
         chain_data = {'chain': samples, 'weights': weights, 'logl': logl,
-                        'logp': logp, 'logz': logz, 'logz_err': logz_err}
-        with open(self.mcmc_path, 'wb') as file:
-            pickle.dump(chain_data, file)
+                        'logp': logp, 'logz': logz, 'logz_err': logz_err, 'log_likelihood': logl}
+        return chain_data
 
 def main():
     parser = argparse.ArgumentParser(
